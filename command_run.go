@@ -1,17 +1,226 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v2"
+	"log"
+	"strings"
 )
+
+func ActionRun(ctx *cli.Context) (err error) {
+	if ctx.Args().Len() < 1 {
+		return fmt.Errorf("image name missing")
+	}
+
+	cfg := &DockerComposeConfig{Services: make(map[string]*Service)}
+	srv := &Service{}
+
+	// load image
+	srv.Image = ctx.Args().Get(0)
+	// load entrypoint
+	if ctx.Args().Len() > 1 {
+		srv.Entrypoint = strings.Join(ctx.Args().Slice()[1:], " ")
+	}
+
+	// insert values
+	// name
+	name := ctx.String("name")
+	if name == "" {
+		name = "unnamed"
+	}
+
+	// env
+	for _, e := range ctx.StringSlice("env") {
+		if !strings.Contains(e, "=") {
+			return fmt.Errorf("invalid environment: %s (missing '='-separator)", e)
+		}
+		if srv.Environment == nil {
+			srv.Environment = make(map[string]string)
+		}
+
+		index := strings.Index(e, "=")
+		key := e[:index]
+		value := e[index+1:]
+
+		srv.Environment[key] = value
+	}
+
+	// env-file
+	for _, e := range ctx.StringSlice("env-file") {
+		srv.EnvFile = append(srv.EnvFile, e)
+	}
+
+	// expose
+	for _, e := range ctx.StringSlice("expose") {
+		srv.Expose = append(srv.Expose, e)
+	}
+
+	// publish
+	for _, e := range ctx.StringSlice("publish") {
+		srv.Publish = append(srv.Publish, e)
+	}
+
+	// interactive
+	if ctx.Bool("interactive") {
+		srv.StdinOpen = true
+	}
+
+	// tty
+	if ctx.Bool("tty") {
+		srv.Tty = true
+	}
+
+	// pid
+	if pid := ctx.String("pid"); pid != "" {
+		srv.Pid = pid
+	}
+
+	// labels
+	for _, l := range ctx.StringSlice("label") {
+		if !strings.Contains(l, "=") {
+			return fmt.Errorf("invalid label: %s (missing '='-separator)", l)
+		}
+		if srv.Labels == nil {
+			srv.Labels = make(map[string]string)
+		}
+
+		index := strings.Index(l, "=")
+		key := l[:index]
+		value := l[index+1:]
+
+		srv.Labels[key] = value
+	}
+
+	// mount
+	for _, m := range ctx.StringSlice("mount") {
+		srv.Tmpfs = append(srv.Tmpfs, m)
+	}
+
+	// network
+	for _, n := range ctx.StringSlice("network") {
+		srv.Networks = append(srv.Networks, n)
+	}
+
+	// restart
+	if restart := ctx.String("restart"); restart != "" {
+		srv.Restart = restart
+	}
+
+	// volumes
+	for _, v := range ctx.StringSlice("volume") {
+		srv.Volumes = append(srv.Volumes, v)
+	}
+
+	// entrypoint
+	if entrypoint := ctx.String("entrypoint"); entrypoint != "" {
+		srv.Entrypoint = entrypoint
+	}
+
+	// serialize
+	cfg.Services[name] = srv
+	var out []byte
+	out, err = yaml.Marshal(cfg)
+	if err != nil {
+		return
+	}
+
+	log.Println("YAML:")
+	fmt.Println(string(out))
+
+	return nil
+}
 
 func CommandRun() *cli.Command {
 	return &cli.Command{
-		Name: "run",
+		Name:   "run",
+		Action: ActionRun,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "add-host",
-				Usage: "Add a custom host-to-IP mapping (host:ip)",
+			&cli.StringSliceFlag{
+				Name:  "env",
+				Usage: "Set environment variables",
+				Aliases: []string{
+					"e",
+				},
 			},
+			&cli.StringSliceFlag{
+				Name:  "env-file",
+				Usage: "Read in a file of environment variables",
+			},
+			&cli.StringSliceFlag{
+				Name:  "expose",
+				Usage: "Expose a port or a range of ports",
+			},
+			&cli.StringSliceFlag{
+				Name:  "publish",
+				Usage: "Expose ports",
+				Aliases: []string{
+					"p",
+				},
+			},
+			// $ docker run -it
+			&cli.BoolFlag{
+				Name:  "interactive",
+				Usage: "Keep STDIN open even if not attached",
+				Aliases: []string{
+					"i",
+				},
+			},
+			&cli.StringSliceFlag{
+				Name:  "label",
+				Usage: "Set meta data on a container",
+				Aliases: []string{
+					"l",
+				},
+			},
+			&cli.StringSliceFlag{
+				Name:  "mount",
+				Usage: "Attach a filesystem mount to the container",
+			},
+			&cli.StringFlag{
+				Name:  "name",
+				Usage: "Assign a name to the container",
+			},
+			&cli.StringSliceFlag{
+				Name:  "network",
+				Usage: "Connect a container to a network",
+				Aliases: []string{
+					"net",
+				},
+			},
+
+			&cli.StringFlag{
+				Name:  "restart",
+				Value: "no",
+				Usage: "Restart policy to apply when a container exits",
+			},
+			// $ docker run -it
+			&cli.BoolFlag{
+				Name:  "tty",
+				Usage: "Allocate a pseudo-TTY",
+				Aliases: []string{
+					"t",
+				},
+			},
+			&cli.StringSliceFlag{
+				Name:  "volume",
+				Usage: "Bind mount a volume",
+				Aliases: []string{
+					"v",
+				},
+			},
+			&cli.StringFlag{
+				Name:  "entrypoint",
+				Usage: "Overwrite the default ENTRYPOINT of the image",
+			},
+
+			&cli.StringFlag{
+				Name:  "pid",
+				Usage: "PID namespace to use",
+			},
+
+			//// Not available in docker-compose (on first sight)
+			// $ echo "test" | docker run -i -a stdin ubuntu cat -
 			&cli.StringFlag{
 				Name:  "attach",
 				Usage: "Attach to STDIN, STDOUT or STDERR",
@@ -19,7 +228,109 @@ func CommandRun() *cli.Command {
 					"a",
 				},
 			},
+			&cli.BoolFlag{
+				Name:  "detach",
+				Usage: "Run container in background and print container ID",
+				Aliases: []string{
+					"d",
+				},
+			},
 			&cli.StringFlag{
+				Name:  "ip",
+				Usage: "IPv4 address (e.g., 172.30.100.104)",
+			},
+			&cli.StringFlag{
+				Name:  "ip6",
+				Usage: "IPv6 address (e.g., 2001:db8::33)",
+			},
+			&cli.PathFlag{
+				Name:  "label-file",
+				Usage: "Read in a line delimited file of labels",
+			},
+			&cli.StringFlag{
+				Name:  "memory",
+				Usage: "Memory limit",
+				Aliases: []string{
+					"m",
+				},
+			},
+			&cli.BoolFlag{
+				Name:  "publish-all",
+				Usage: "Publish all exposed ports to random ports",
+				Aliases: []string{
+					"P",
+				},
+			},
+			&cli.StringFlag{
+				Name:  "pull",
+				Usage: "Pull image before running (\"always\"|\"missing\"|\"never\")",
+			},
+			&cli.BoolFlag{
+				Name:  "rm",
+				Usage: "Automatically remove the container when it exits",
+			},
+			&cli.StringFlag{
+				Name:  "workdir",
+				Usage: "Working directory inside the container",
+				Aliases: []string{
+					"w",
+				},
+			},
+
+			//// Implement later
+			&cli.StringFlag{
+				Name:  "health-timeout",
+				Usage: "Maximum time to allow one check to run (ms|s|m|h) (default 0s)",
+			},
+			&cli.StringFlag{
+				Name:  "health-cmd",
+				Usage: "Command to run to check health",
+			},
+			&cli.StringFlag{
+				Name:  "health-interval",
+				Usage: "Time between running the check (ms|s|m|h) (default 0s)",
+			},
+			&cli.StringFlag{
+				Name:  "health-retries",
+				Usage: "Consecutive failures needed to report unhealthy",
+			},
+			&cli.StringFlag{
+				Name:  "health-start-period",
+				Usage: "API 1.29+Start period for the container to initialize before starting health-retries countdown (ms|s|m|h) (default 0s)",
+			},
+			&cli.StringFlag{
+				Name:  "hostname",
+				Usage: "Container host name",
+			},
+			&cli.StringFlag{
+				Name:  "dns",
+				Usage: "Set custom DNS servers",
+			},
+			&cli.StringFlag{
+				Name:  "dns-opt",
+				Usage: "Set DNS options",
+			},
+			&cli.StringFlag{
+				Name:  "dns-option",
+				Usage: "Set DNS options",
+			},
+			&cli.StringFlag{
+				Name:  "dns-search",
+				Usage: "Set custom DNS search domains",
+			},
+			&cli.StringFlag{
+				Name:  "domainname",
+				Usage: "Container NIS domain name",
+			},
+			&cli.StringFlag{
+				Name:  "privileged",
+				Usage: "Give extended privileges to this container",
+			},
+			&cli.StringFlag{
+				Name:  "link",
+				Usage: "Add link to another container",
+			},
+			&cli.UintFlag{
 				Name:  "blkio-weight",
 				Usage: "Block IO (relative weight), between 10 and 1000, or 0 to disable (default 0)",
 			},
@@ -41,7 +352,7 @@ func CommandRun() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "cgroupns",
-				Usage: "API 1.41+Cgroup namespace to use (host|private)\\n'host':    Run the container in the Docker host's cgroup namespace\\n'private': Run the container in its own private cgroup namespace\\n'':        Use the cgroup namespace as configured by the\\n           default-cgroupns-mode option on the daemon (default)",
+				Usage: "API 1.41+Cgroup namespace to use (host|private)\n'host':    Run the container in the Docker host's cgroup namespace\n'private': Run the container in its own private cgroup namespace\n'':        Use the cgroup namespace as configured by the\n           default-cgroupns-mode option on the daemon (default)",
 			},
 			&cli.StringFlag{
 				Name:  "cidfile",
@@ -91,13 +402,6 @@ func CommandRun() *cli.Command {
 				Usage: "MEMs in which to allow execution (0-3, 0,1)",
 			},
 			&cli.StringFlag{
-				Name:  "detach",
-				Usage: "Run container in background and print container ID",
-				Aliases: []string{
-					"d",
-				},
-			},
-			&cli.StringFlag{
 				Name:  "detach-keys",
 				Usage: "Override the key sequence for detaching a container",
 			},
@@ -131,45 +435,6 @@ func CommandRun() *cli.Command {
 				Usage: "Skip image verification",
 			},
 			&cli.StringFlag{
-				Name:  "dns",
-				Usage: "Set custom DNS servers",
-			},
-			&cli.StringFlag{
-				Name:  "dns-opt",
-				Usage: "Set DNS options",
-			},
-			&cli.StringFlag{
-				Name:  "dns-option",
-				Usage: "Set DNS options",
-			},
-			&cli.StringFlag{
-				Name:  "dns-search",
-				Usage: "Set custom DNS search domains",
-			},
-			&cli.StringFlag{
-				Name:  "domainname",
-				Usage: "Container NIS domain name",
-			},
-			&cli.StringFlag{
-				Name:  "entrypoint",
-				Usage: "Overwrite the default ENTRYPOINT of the image",
-			},
-			&cli.StringFlag{
-				Name:  "env",
-				Usage: "Set environment variables",
-				Aliases: []string{
-					"e",
-				},
-			},
-			&cli.StringFlag{
-				Name:  "env-file",
-				Usage: "Read in a file of environment variables",
-			},
-			&cli.StringFlag{
-				Name:  "expose",
-				Usage: "Expose a port or a range of ports",
-			},
-			&cli.StringFlag{
 				Name:  "gpus",
 				Usage: "API 1.40+GPU devices to add to the container ('all' to pass all GPUs)",
 			},
@@ -178,44 +443,8 @@ func CommandRun() *cli.Command {
 				Usage: "Add additional groups to join",
 			},
 			&cli.StringFlag{
-				Name:  "health-cmd",
-				Usage: "Command to run to check health",
-			},
-			&cli.StringFlag{
-				Name:  "health-interval",
-				Usage: "Time between running the check (ms|s|m|h) (default 0s)",
-			},
-			&cli.StringFlag{
-				Name:  "health-retries",
-				Usage: "Consecutive failures needed to report unhealthy",
-			},
-			&cli.StringFlag{
-				Name:  "health-start-period",
-				Usage: "API 1.29+Start period for the container to initialize before starting health-retries countdown (ms|s|m|h) (default 0s)",
-			},
-			&cli.StringFlag{
-				Name:  "health-timeout",
-				Usage: "Maximum time to allow one check to run (ms|s|m|h) (default 0s)",
-			},
-			/*
-				&cli.StringFlag{
-					Name: "hostname",
-					Usage: "Container host name",
-					Aliases: []string{
-						"h",
-					},
-				},
-			*/
-			&cli.StringFlag{
 				Name:  "init",
 				Usage: "API 1.25+Run an init inside the container that forwards signals and reaps processes",
-			},
-			&cli.StringFlag{
-				Name:  "interactive",
-				Usage: "Keep STDIN open even if not attached",
-				Aliases: []string{
-					"i",
-				},
 			},
 			&cli.StringFlag{
 				Name:  "io-maxbandwidth",
@@ -224,14 +453,6 @@ func CommandRun() *cli.Command {
 			&cli.StringFlag{
 				Name:  "io-maxiops",
 				Usage: "Maximum IOps limit for the system drive (Windows only)",
-			},
-			&cli.StringFlag{
-				Name:  "ip",
-				Usage: "IPv4 address (e.g., 172.30.100.104)",
-			},
-			&cli.StringFlag{
-				Name:  "ip6",
-				Usage: "IPv6 address (e.g., 2001:db8::33)",
 			},
 			&cli.StringFlag{
 				Name:  "ipc",
@@ -244,21 +465,6 @@ func CommandRun() *cli.Command {
 			&cli.StringFlag{
 				Name:  "kernel-memory",
 				Usage: "Kernel memory limit",
-			},
-			&cli.StringFlag{
-				Name:  "label",
-				Usage: "Set meta data on a container",
-				Aliases: []string{
-					"l",
-				},
-			},
-			&cli.StringFlag{
-				Name:  "label-file",
-				Usage: "Read in a line delimited file of labels",
-			},
-			&cli.StringFlag{
-				Name:  "link",
-				Usage: "Add link to another container",
 			},
 			&cli.StringFlag{
 				Name:  "link-local-ip",
@@ -277,13 +483,6 @@ func CommandRun() *cli.Command {
 				Usage: "Container MAC address (e.g., 92:d0:c6:0a:29:33)",
 			},
 			&cli.StringFlag{
-				Name:  "memory",
-				Usage: "Memory limit",
-				Aliases: []string{
-					"m",
-				},
-			},
-			&cli.StringFlag{
 				Name:  "memory-reservation",
 				Usage: "Memory soft limit",
 			},
@@ -297,24 +496,8 @@ func CommandRun() *cli.Command {
 				Usage: "Tune container memory swappiness (0 to 100)",
 			},
 			&cli.StringFlag{
-				Name:  "mount",
-				Usage: "Attach a filesystem mount to the container",
-			},
-			&cli.StringFlag{
-				Name:  "name",
-				Usage: "Assign a name to the container",
-			},
-			&cli.StringFlag{
-				Name:  "net",
-				Usage: "Connect a container to a network",
-			},
-			&cli.StringFlag{
 				Name:  "net-alias",
 				Usage: "Add network-scoped alias for the container",
-			},
-			&cli.StringFlag{
-				Name:  "network",
-				Usage: "Connect a container to a network",
 			},
 			&cli.StringFlag{
 				Name:  "network-alias",
@@ -333,10 +516,6 @@ func CommandRun() *cli.Command {
 				Usage: "Tune host's OOM preferences (-1000 to 1000)",
 			},
 			&cli.StringFlag{
-				Name:  "pid",
-				Usage: "PID namespace to use",
-			},
-			&cli.StringFlag{
 				Name:  "pids-limit",
 				Usage: "Tune container pids limit (set -1 for unlimited)",
 			},
@@ -345,40 +524,8 @@ func CommandRun() *cli.Command {
 				Usage: "API 1.32+Set platform if server is multi-platform capable",
 			},
 			&cli.StringFlag{
-				Name:  "privileged",
-				Usage: "Give extended privileges to this container",
-			},
-			&cli.StringFlag{
-				Name:  "publish",
-				Usage: "Publish a container's port(s) to the host",
-				Aliases: []string{
-					"p",
-				},
-			},
-			&cli.StringFlag{
-				Name:  "publish-all",
-				Usage: "Publish all exposed ports to random ports",
-				Aliases: []string{
-					"P",
-				},
-			},
-			&cli.StringFlag{
-				Name:  "pull",
-				Value: "missing",
-				Usage: "Pull image before running (\"always\"|\"missing\"|\"never\")",
-			},
-			&cli.StringFlag{
 				Name:  "read-only",
 				Usage: "Mount the container's root filesystem as read only",
-			},
-			&cli.StringFlag{
-				Name:  "restart",
-				Value: "no",
-				Usage: "Restart policy to apply when a container exits",
-			},
-			&cli.StringFlag{
-				Name:  "rm",
-				Usage: "Automatically remove the container when it exits",
 			},
 			&cli.StringFlag{
 				Name:  "runtime",
@@ -419,13 +566,6 @@ func CommandRun() *cli.Command {
 				Usage: "Mount a tmpfs directory",
 			},
 			&cli.StringFlag{
-				Name:  "tty",
-				Usage: "Allocate a pseudo-TTY",
-				Aliases: []string{
-					"t",
-				},
-			},
-			&cli.StringFlag{
 				Name:  "ulimit",
 				Usage: "Ulimit options",
 			},
@@ -445,26 +585,12 @@ func CommandRun() *cli.Command {
 				Usage: "UTS namespace to use",
 			},
 			&cli.StringFlag{
-				Name:  "volume",
-				Usage: "Bind mount a volume",
-				Aliases: []string{
-					"v",
-				},
-			},
-			&cli.StringFlag{
 				Name:  "volume-driver",
 				Usage: "Optional volume driver for the container",
 			},
 			&cli.StringFlag{
 				Name:  "volumes-from",
 				Usage: "Mount volumes from the specified container(s)",
-			},
-			&cli.StringFlag{
-				Name:  "workdir",
-				Usage: "Working directory inside the container",
-				Aliases: []string{
-					"w",
-				},
 			},
 		},
 	}
