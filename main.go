@@ -6,6 +6,8 @@ import (
 	"os"
 )
 
+const Version = "1.0.0-alpha"
+
 func main() {
 	app := &cli.App{
 		EnableBashCompletion: true,

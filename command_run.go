@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v2"
-	"log"
+	"os"
 	"strings"
 )
 
@@ -12,12 +11,20 @@ func ActionRun(ctx *cli.Context) (err error) {
 	if ctx.Args().Len() < 1 {
 		return fmt.Errorf("image name missing")
 	}
-
-	cfg := &DockerComposeConfig{Services: make(map[string]*Service)}
 	srv := &Service{}
 
 	// load image
 	srv.Image = ctx.Args().Get(0)
+
+	// build?
+	if srv.Image == "." {
+		srv.Build = &Build{
+			Context:    ".",
+			Dockerfile: "Dockerfile",
+		}
+		srv.Image = ""
+	}
+
 	// load entrypoint
 	if ctx.Args().Len() > 1 {
 		srv.Entrypoint = strings.Join(ctx.Args().Slice()[1:], " ")
@@ -118,16 +125,20 @@ func ActionRun(ctx *cli.Context) (err error) {
 	}
 
 	// serialize
-	cfg.Services[name] = srv
 	var out []byte
-	out, err = yaml.Marshal(cfg)
+	out, err = srv.Marshal(name, true)
 	if err != nil {
 		return
 	}
 
-	log.Println("YAML:")
-	fmt.Println(string(out))
+	// print result
+	if !ctx.Bool("quiet") {
+		fmt.Println("#", "[ d2dc v.", Version, "]")
+		fmt.Println("#", "Generated docker-compose [service] from:")
+		fmt.Println("#", strings.Join(os.Args, " "))
+	}
 
+	fmt.Println(string(out))
 	return nil
 }
 
@@ -136,6 +147,13 @@ func CommandRun() *cli.Command {
 		Name:   "run",
 		Action: ActionRun,
 		Flags: []cli.Flag{
+
+			// d2dc flags
+			&cli.BoolFlag{
+				Name: "quiet",
+			},
+
+			// docker run flags
 			&cli.StringSliceFlag{
 				Name:  "env",
 				Usage: "Set environment variables",
@@ -318,14 +336,7 @@ func CommandRun() *cli.Command {
 				Name:  "dns-search",
 				Usage: "Set custom DNS search domains",
 			},
-			&cli.StringFlag{
-				Name:  "domainname",
-				Usage: "Container NIS domain name",
-			},
-			&cli.StringFlag{
-				Name:  "privileged",
-				Usage: "Give extended privileges to this container",
-			},
+
 			&cli.StringFlag{
 				Name:  "link",
 				Usage: "Add link to another container",
