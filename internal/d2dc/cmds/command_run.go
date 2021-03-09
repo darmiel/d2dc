@@ -1,7 +1,8 @@
-package main
+package cmds
 
 import (
 	"fmt"
+	"github.com/darmiel/d2dc/internal/d2dc/cfg"
 	"github.com/urfave/cli/v2"
 	"os"
 	"strings"
@@ -11,14 +12,14 @@ func ActionRun(ctx *cli.Context) (err error) {
 	if ctx.Args().Len() < 1 {
 		return fmt.Errorf("image name missing")
 	}
-	srv := &Service{}
+	srv := &cfg.Service{}
 
 	// load image
 	srv.Image = ctx.Args().Get(0)
 
 	// build?
 	if srv.Image == "." {
-		srv.Build = &Build{
+		srv.Build = &cfg.Build{
 			Context:    ".",
 			Dockerfile: "Dockerfile",
 		}
@@ -133,12 +134,12 @@ func ActionRun(ctx *cli.Context) (err error) {
 
 	// print result
 	if !ctx.Bool("quiet") {
-		fmt.Println("#", "[ d2dc v.", Version, "]")
+		fmt.Println("#", "[ d2dc v.", ctx.App.Version, "]")
 		fmt.Println("#", "Generated docker-compose [service] from:")
 		fmt.Println("#", strings.Join(os.Args, " "))
 	}
 
-	fmt.Println(string(out))
+	fmt.Print(string(out))
 	return nil
 }
 
@@ -147,12 +148,6 @@ func CommandRun() *cli.Command {
 		Name:   "run",
 		Action: ActionRun,
 		Flags: []cli.Flag{
-
-			// d2dc flags
-			&cli.BoolFlag{
-				Name: "quiet",
-			},
-
 			// docker run flags
 			&cli.StringSliceFlag{
 				Name:  "env",
