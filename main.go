@@ -1,6 +1,10 @@
 package main
 
-import "log"
+import (
+	"github.com/urfave/cli/v2"
+	"log"
+	"os"
+)
 
 const DebugInput = "docker run --rm -d " +
 	"--name ftp " +
@@ -14,4 +18,15 @@ const DebugInput = "docker run --rm -d " +
 
 func main() {
 	log.Println("Input:", DebugInput)
+
+	app := &cli.App{
+		Commands: []*cli.Command{
+			CommandDockerRun(), // alias to "run" for "docker run"
+			CommandRun(),
+		},
+	}
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatalln("Error running:", err)
+	}
 }
