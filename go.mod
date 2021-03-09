@@ -1,4 +1,4 @@
-module github.com/darmiel/docker-compose-service-generator
+module github.com/darmiel/d2dc
 
 go 1.15
 

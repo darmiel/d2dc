@@ -1,2 +1,2 @@
-# docker-compose Service Generator
+# d2dc
 > Allan, please add details!
