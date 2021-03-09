@@ -81,7 +81,7 @@ func ActionRun(ctx *cli.Context) (err error) {
 
 	// pid
 	if pid := ctx.String("pid"); pid != "" {
-		srv.Pid = pid
+		srv.PID = pid
 	}
 
 	// labels
