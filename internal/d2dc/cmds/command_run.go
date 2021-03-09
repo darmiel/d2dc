@@ -204,7 +204,6 @@ func CommandRun() *cli.Command {
 
 			&cli.StringFlag{
 				Name:  "restart",
-				Value: "no",
 				Usage: "Restart policy to apply when a container exits",
 			},
 			// $ docker run -it
