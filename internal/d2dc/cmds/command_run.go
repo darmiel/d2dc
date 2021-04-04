@@ -3,6 +3,7 @@ package cmds
 import (
 	"fmt"
 	"github.com/darmiel/d2dc/internal/d2dc/cfg"
+	"github.com/muesli/termenv"
 	"github.com/urfave/cli/v2"
 	"os"
 	"strings"
@@ -134,9 +135,11 @@ func ActionRun(ctx *cli.Context) (err error) {
 
 	// print result
 	if !ctx.Bool("quiet") {
-		fmt.Println("#", "[ d2dc v.", ctx.App.Version, "]")
-		fmt.Println("#", "Generated docker-compose [service] from:")
-		fmt.Println("#", strings.Join(os.Args, " "))
+		p := termenv.ColorProfile()
+		blue := p.Color("#71BEF2")
+		fmt.Println("#", termenv.String("[ d2dc v.", ctx.App.Version, "]").Foreground(p.Color("0")).Background(blue))
+		fmt.Println("#", termenv.String("Generated docker-compose [service] from:").Foreground(blue))
+		fmt.Println("#", termenv.String(strings.Join(os.Args, " ")).Foreground(blue))
 	}
 
 	fmt.Print(string(out))
