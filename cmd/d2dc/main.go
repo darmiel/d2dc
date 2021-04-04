@@ -12,7 +12,7 @@ func main() {
 		Name:                   "🐳 d2dc",
 		Usage:                  "Docker to Docker-Compose",
 		UsageText:              "d2dc <docker command>",
-		Version:                "1.0.0-alpha",
+		Version:                "1.0.1-alpha",
 		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			cmds.CommandDockerRun(), // alias to "run" for "docker run"
