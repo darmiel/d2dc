@@ -12,7 +12,7 @@ func main() {
 		Name:                   "🐳 d2dc",
 		Usage:                  "Docker to Docker-Compose",
 		UsageText:              "d2dc <docker command>",
-		Version:                "1.0.1-alpha",
+		Version:                "1.1.0-alpha",
 		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			cmds.CommandDockerRun(), // alias to "run" for "docker run"
@@ -20,7 +20,12 @@ func main() {
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name: "quiet",
+				Name:    "quiet",
+				Aliases: []string{"q"},
+			},
+			&cli.BoolFlag{
+				Name:    "absolute-path",
+				Aliases: []string{"a"},
 			},
 		},
 		EnableBashCompletion: true,

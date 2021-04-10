@@ -164,9 +164,6 @@ func CommandRun() *cli.Command {
 		Name:   "run",
 		Action: ActionRun,
 		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name: "absolute-path",
-			},
 			// docker run flags
 			&cli.StringSliceFlag{
 				Name:  "env",
