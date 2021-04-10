@@ -1,0 +1,22 @@
+name: Test Go Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-go-build:
+    name: Go Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gover: ["1.13", "1.14", "1.15", "1.16"]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.gover }}
+
+      - run: go build ./cmd/d2dc
