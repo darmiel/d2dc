@@ -6,6 +6,7 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/urfave/cli/v2"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -117,7 +118,19 @@ func ActionRun(ctx *cli.Context) (err error) {
 	}
 
 	// volumes
+	absPath := ctx.Bool("absolute-path")
+	p, _ := filepath.Abs(filepath.Dir("."))
 	for _, v := range ctx.StringSlice("volume") {
+		// check if volume starts with current path
+		if p != "" && strings.HasPrefix(v, p) {
+			if !absPath {
+				v = v[len(p):]
+				if strings.HasPrefix(v, "/") {
+					v = v[1:]
+				}
+				v = "./" + v
+			}
+		}
 		srv.Volumes = append(srv.Volumes, v)
 	}
 
@@ -151,6 +164,9 @@ func CommandRun() *cli.Command {
 		Name:   "run",
 		Action: ActionRun,
 		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name: "absolute-path",
+			},
 			// docker run flags
 			&cli.StringSliceFlag{
 				Name:  "env",
