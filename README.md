@@ -42,6 +42,14 @@ services:
     - "21:21"
 ```
 
+## Installation
+
+If you have Go installed, you can use the following command to get d2dc:
+
+```bash
+go install github.com/darmiel/d2dc/cmd/d2dc@latest
+```
+
 ## Build
 ### Prerequisites
 * Go 1.15+
